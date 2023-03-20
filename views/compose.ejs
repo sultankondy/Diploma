@@ -1,11 +1,13 @@
 <%- include("partials/header"); -%>
     <h1>Compose</h1>
-    <form class="" action="/news-compose" method="post">
+    <form class="" action="/news-compose" method="post" enctype="multipart/form-data">
       <div class="form-group">
         <label>Title</label>
         <input class="form-control" type="text" name="newsTitle">
         <label>Post</label>
         <textarea class="form-control" name="newsBody" rows="5" cols="30"></textarea>
+        <label>Upload Image</label>
+        <input type="file" name="image">
       </div>
       <button class="btn btn-primary" type="submit" name="button">Publish</button>
     </form>

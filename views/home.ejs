@@ -2,36 +2,23 @@
 <%- include("partials/header"); -%>
     <h1>Home</h1>
 
-	<h1>Next Prayer Time</h1>
-    <p>Time until <%= nextPrayerTime %></p>
-	
-    <%
-    const filteredPrayerTimes = Object.keys(todayPrayerTimes)
-	  .filter(key => ['Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'].includes(key))
-	  .reduce((obj, key) => {
-	    obj[key] = prayerTimes[key];
-	    return obj;
-	  }, {});
-    %>
+   	 
     <ul style="display: flex;">
-
-    	Object.keys(user);
-
-    	<% filteredPrayerTimes.forEach(function(timings){ %>
-		<li style="list-style: none;margin-right: 30px;"><%= timings %></li>
-    	<% }); %>
-		
+    	<% for (var i = 0; i < listOfTimes.length; i++) { %>
+		<li style="list-style: none;margin-right: 30px;"><b><%= listOfTimes[i] %>:</b> <%= todayPrayerTimes[listOfTimes[i]] %></li>
+		<% } %>
 	</ul>
 
 
-  	<% news.forEach(function(news){ %>
-
-    <h1><%=news.title%></h1>
-    <p>
-    <%=news.content.substring(0, 100) + " ..."%>
-    <a href="/news/<%=news._id%>">Read More</a>
-    </p>
-
+  	<% items.forEach(function(news){ %>
+    <div>
+        <img src="data:image/<%=news.img.contentType%>;base64,<%=news.img.data.toString('base64')%>" width="200">
+        <h1><%=news.title%></h1>
+        <p>
+        <%=news.content.substring(0, 100) + " ..."%>
+        <a href="/news/<%=news._id%>">Read More</a>
+        </p>
+    </div>
 
     <% }) %>
 

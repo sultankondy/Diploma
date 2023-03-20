@@ -1,34 +1,46 @@
 //jshint esversion:6
 const express = require("express");
+const app = express();
 const bodyParser = require("body-parser");
 const mongoose = require('mongoose');
+
 const ejs = require("ejs");
-const NodeGeocoder = require('node-geocoder');
+const fs = require('fs');
+const path = require('path');
+require('dotenv/config');
 const https = require("https");
 const fetch = require("node-fetch");
-const functions = require(__dirname + "/functions.js");
-const path = require('path');
-const app = express();
-const axios = require('axios');
-const cheerio = require('cheerio');
+const multer = require("multer");
 
-mongoose.connect("mongodb://127.0.0.1:27017/projectDB");
+const NodeGeocoder = require('node-geocoder');
+
+mongoose.connect(process.env.MONGO_URL, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+});
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
 app.use(bodyParser.urlencoded({extended: true}));
 app.use(express.static("public"));
-
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // TODO
 const city = "Алматы"; 
 const currentYear = new Date().getFullYear();
-const newsSchema = {
-	title: String,
-	content: String,
-}
-const News = new mongoose.model("News", newsSchema);
 
+const storage = multer.diskStorage({
+	destination: (req, file, cb) => {
+		cb(null, 'uploads')
+	},
+	filename: (req, file, cb) => {
+		cb(null, file.fieldname + '-' + Date.now())
+	}
+});
+
+const upload = multer({ storage: storage });
+
+const newsModel = require('./model');
 
 app.get("/", function(req, res){
 	const date = new Date();
@@ -42,12 +54,14 @@ app.get("/", function(req, res){
 	const school = 1;
 	const url = `https://api.aladhan.com/v1/timings/${day}-${month}-${year}?latitude=${lat}&longitude=${lng}&method=${methodISNA}&school=${school}`;
 	const list = ['Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
-	https.get(url, (res) => {
+	console.log(url);
+
+	https.get(url, (response) => {
 	  let data = '';
-	  res.on('data', (chunk) => {
+	  response.on('data', (chunk) => {
 	    data += chunk;
 	  });
-	  res.on('end', () => {
+	  response.on('end', () => {
 	    var prayerTimes = JSON.parse(data).data.timings;
 	    for(var i = 0;i<6;i++){
 	    	var add = 0;
@@ -60,62 +74,59 @@ app.get("/", function(req, res){
 	    			else if(i>1 && i<5) add+=5;
 	    		}
 	    	}
-
 	    	var arr = prayerTimes[list[i]].split(':');
 	    	var dateNamaz = new Date('2016/11/9 ' + prayerTimes[list[i]]);
 	    	dateNamaz.setMinutes(dateNamaz.getMinutes() + add);
 	    	var hour = dateNamaz.getHours();
 	    	var min = dateNamaz.getMinutes();
 	    	prayerTimes[list[i]] = (((hour<10) ? ('0' + hour):(hour)) + ":" + ((min<10)?('0' + min):(min)));
-	    	console.log(prayerTimes[list[i]]);
+	    	//console.log(prayerTimes[list[i]]);
 	    }
 	    console.log(prayerTimes);
+
+		newsModel.find().then((items) => {
+			res.render('home', { 
+				items: items,
+				todayPrayerTimes: prayerTimes,
+		        listOfTimes: list,
+			});  
+		}).catch((err) => {
+			console.log(err);
+	        res.status(500).send('An error occurred', err);
+		});
 	  });
 	}).on('error', (err) => {
 	  console.error(err);
 	});
-
-	res.send("Hello")
-    News.find().then((news)=>{
-		res.render("home", {
-	        news: news,
-	        todayPrayerTimes: prayerTimes,
-	    });
-	}).catch((err)=>{
-		console.error(err);
-	});
-
-	
 });
 
 app.route("/news-compose")
 	.get(function(req, res){
 		res.render("compose");
 	})
-	.post(function(req, res){
-		const news = new News({
-		    title: req.body.newsTitle,
-		    content: req.body.newsBody 
-	  	});
+	.post(upload.single('image') ,function(req, res){
+	  	const obj = {
+	        title: req.body.newsTitle,
+	        content: req.body.newsBody,
+	        img: {
+	            data: fs.readFileSync(path.join(__dirname + '/uploads/' + req.file.filename)),
+	            contentType: 'image/png'
+	        }
+	    }
 
-		news.save().then(()=>{
-			res.redirect("/");
-		}).catch((err)=>{
-			console.error(err);
-		});
-
+	    newsModel.create(obj).then((item) => {
+	    	res.redirect("/"); 
+	    }).catch((err) => {
+	    	console.log(err);
+	    });
 	});
-
-
 
 app.get("/news/:newsID", function(req, res){
 	const requestedID = req.params.newsID;
 	console.log(requestedID);
-	News.findOne({_id: requestedID}).then((news)=>{
-		res.render("news", {
-			title: news.title,
-			content: news.content,
-		});
+
+	newsModel.findOne({_id: requestedID}).then((news) => {
+		res.render("news", {news});
 	}).catch((err)=>{
 		console.error(err);
 	});
@@ -228,7 +239,8 @@ app.get("/sixth-button-in-main-menu", function(req, res){
 });
 
 //////////////////////////////////////MENU BUTTONS IN MAIN PAGE end
-app.listen(3000, () => {
+var port = process.env.PORT || '3000'
+app.listen(port, () => {
   console.log('Server listening on port 3000');
 });
 
